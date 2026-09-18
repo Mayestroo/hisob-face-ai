@@ -1,2 +1,10 @@
 [tool.pytest.ini_options]
 pythonpath = ["."]
+
+[project]
+name = "hisob-face-ai"
+version = "0.0.0"
+dependencies = [
+    "numpy==2.5.3",
+    "onnxruntime-gpu==1.29.0",
+]

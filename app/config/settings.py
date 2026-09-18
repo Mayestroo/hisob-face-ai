@@ -53,6 +53,9 @@ class ModelRuntimeSettings:
     model_identifier: str
     device: str = "cpu"
     detection_interval_seconds: float = 1.0
+    confidence_threshold: float = 0.5
+    nms_threshold: float = 0.5
+    model_sha256: str | None = None
 
     def __post_init__(self) -> None:
         _require_non_empty_string(self.model_identifier, "model_identifier")
@@ -66,6 +69,18 @@ class ModelRuntimeSettings:
             raise TypeError("detection_interval_seconds must be a number")
         if not math.isfinite(float(self.detection_interval_seconds)) or self.detection_interval_seconds <= 0:
             raise ValueError("detection_interval_seconds must be greater than zero")
+        for value, field_name in (
+            (self.confidence_threshold, "confidence_threshold"),
+            (self.nms_threshold, "nms_threshold"),
+        ):
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                raise TypeError(f"{field_name} must be a number")
+            if not math.isfinite(float(value)) or not 0.0 <= float(value) <= 1.0:
+                raise ValueError(f"{field_name} must be between 0.0 and 1.0")
+        if self.model_sha256 is not None:
+            model_sha256 = _require_non_empty_string(self.model_sha256, "model_sha256")
+            if len(model_sha256) != 64 or any(character not in "0123456789abcdefABCDEF" for character in model_sha256):
+                raise ValueError("model_sha256 must be a 64-character hexadecimal digest")
 
 
 @dataclass(frozen=True)
