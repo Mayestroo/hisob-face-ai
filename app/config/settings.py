@@ -1,0 +1,109 @@
+"""Typed, deterministic configuration for the Face AI application."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+import math
+import re
+
+from app.domain.models import CameraRole
+
+
+_SUPPORTED_DEVICES = frozenset({"cpu", "cuda", "mps"})
+_CREDENTIALS_IN_SOURCE = re.compile(r"(?://)[^/@\s]+@")
+
+
+def _require_non_empty_string(value: object, field_name: str) -> str:
+    if not isinstance(value, str):
+        raise TypeError(f"{field_name} must be a string")
+    if not value.strip():
+        raise ValueError(f"{field_name} must not be empty")
+    return value
+
+
+def _redact_source(source: str) -> str:
+    return _CREDENTIALS_IN_SOURCE.sub("://***@", source)
+
+
+@dataclass(frozen=True, repr=False)
+class CameraConfig:
+    """A physical camera source with an explicit semantic role."""
+
+    camera_id: str
+    role: CameraRole
+    source: str
+
+    def __post_init__(self) -> None:
+        _require_non_empty_string(self.camera_id, "camera_id")
+        if not isinstance(self.role, CameraRole):
+            raise TypeError("role must be a CameraRole")
+        _require_non_empty_string(self.source, "source")
+
+    def __repr__(self) -> str:
+        return (
+            f"CameraConfig(camera_id={self.camera_id!r}, role={self.role!r}, "
+            f"source={_redact_source(self.source)!r})"
+        )
+
+
+@dataclass(frozen=True)
+class ModelRuntimeSettings:
+    """Minimal model and runtime choices needed by later pipeline tasks."""
+
+    model_identifier: str
+    device: str = "cpu"
+    detection_interval_seconds: float = 1.0
+
+    def __post_init__(self) -> None:
+        _require_non_empty_string(self.model_identifier, "model_identifier")
+        _require_non_empty_string(self.device, "device")
+        if self.device not in _SUPPORTED_DEVICES:
+            supported = ", ".join(sorted(_SUPPORTED_DEVICES))
+            raise ValueError(f"device must be one of: {supported}")
+        if isinstance(self.detection_interval_seconds, bool) or not isinstance(
+            self.detection_interval_seconds, (int, float)
+        ):
+            raise TypeError("detection_interval_seconds must be a number")
+        if not math.isfinite(float(self.detection_interval_seconds)) or self.detection_interval_seconds <= 0:
+            raise ValueError("detection_interval_seconds must be greater than zero")
+
+
+@dataclass(frozen=True)
+class StorageSettings:
+    """Paths reserved for future local persistence."""
+
+    data_directory: str
+    database_name: str
+
+    def __post_init__(self) -> None:
+        _require_non_empty_string(self.data_directory, "data_directory")
+        database_name = _require_non_empty_string(self.database_name, "database_name")
+        if database_name in {".", ".."} or "/" in database_name or "\\" in database_name:
+            raise ValueError("database_name must be a relative file name")
+
+
+@dataclass(frozen=True)
+class ApplicationSettings:
+    """Complete validated settings required to construct the application."""
+
+    cameras: tuple[CameraConfig, ...]
+    model: ModelRuntimeSettings
+    storage: StorageSettings
+
+    def __post_init__(self) -> None:
+        if isinstance(self.cameras, (str, bytes)):
+            raise TypeError("cameras must be an iterable of CameraConfig values")
+        try:
+            cameras = tuple(self.cameras)
+        except TypeError as error:
+            raise TypeError("cameras must be an iterable of CameraConfig values") from error
+        if any(not isinstance(camera, CameraConfig) for camera in cameras):
+            raise TypeError("cameras must contain only CameraConfig values")
+        camera_ids = [camera.camera_id for camera in cameras]
+        if len(camera_ids) != len(set(camera_ids)):
+            raise ValueError("camera IDs must be unique")
+        if not isinstance(self.model, ModelRuntimeSettings):
+            raise TypeError("model must be ModelRuntimeSettings")
+        if not isinstance(self.storage, StorageSettings):
+            raise TypeError("storage must be StorageSettings")
+        object.__setattr__(self, "cameras", cameras)
