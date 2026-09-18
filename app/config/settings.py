@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import math
 import re
 
@@ -84,6 +84,31 @@ class ModelRuntimeSettings:
 
 
 @dataclass(frozen=True)
+class TrackingSettings:
+    """Deterministic, camera-local tracking thresholds."""
+
+    tracking_iou_threshold: float = 0.3
+    tracking_min_confirmed_hits: int = 2
+    tracking_max_lost_frames: int = 2
+
+    def __post_init__(self) -> None:
+        if isinstance(self.tracking_iou_threshold, bool) or not isinstance(self.tracking_iou_threshold, (int, float)):
+            raise TypeError("tracking_iou_threshold must be a number")
+        threshold = float(self.tracking_iou_threshold)
+        if not math.isfinite(threshold) or not 0.0 <= threshold <= 1.0:
+            raise ValueError("tracking_iou_threshold must be between 0.0 and 1.0")
+        for value, field_name in (
+            (self.tracking_min_confirmed_hits, "tracking_min_confirmed_hits"),
+            (self.tracking_max_lost_frames, "tracking_max_lost_frames"),
+        ):
+            if isinstance(value, bool) or not isinstance(value, int):
+                raise TypeError(f"{field_name} must be an integer")
+            minimum = 1 if field_name.endswith("hits") else 0
+            if value < minimum:
+                raise ValueError(f"{field_name} must be at least {minimum}")
+
+
+@dataclass(frozen=True)
 class StorageSettings:
     """Paths reserved for future local persistence."""
 
@@ -104,6 +129,7 @@ class ApplicationSettings:
     cameras: tuple[CameraConfig, ...]
     model: ModelRuntimeSettings
     storage: StorageSettings
+    tracking: TrackingSettings = field(default_factory=TrackingSettings)
 
     def __post_init__(self) -> None:
         if isinstance(self.cameras, (str, bytes)):
@@ -121,4 +147,6 @@ class ApplicationSettings:
             raise TypeError("model must be ModelRuntimeSettings")
         if not isinstance(self.storage, StorageSettings):
             raise TypeError("storage must be StorageSettings")
+        if not isinstance(self.tracking, TrackingSettings):
+            raise TypeError("tracking must be TrackingSettings")
         object.__setattr__(self, "cameras", cameras)

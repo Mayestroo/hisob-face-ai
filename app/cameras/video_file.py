@@ -34,6 +34,7 @@ class DecodedVideoFrame:
     pixels: bytes
     width: int
     height: int
+    frame_index: int
     pixel_format: str = "gray"
 
     def __post_init__(self) -> None:
@@ -45,6 +46,8 @@ class DecodedVideoFrame:
             raise ValueError("width must be greater than zero")
         if not isinstance(self.height, int) or isinstance(self.height, bool) or self.height <= 0:
             raise ValueError("height must be greater than zero")
+        if not isinstance(self.frame_index, int) or isinstance(self.frame_index, bool) or self.frame_index < 0:
+            raise ValueError("frame_index must be a non-negative integer")
         if self.pixel_format != "gray":
             raise ValueError("pixel_format must be 'gray'")
         expected_size = self.width * self.height
@@ -69,9 +72,8 @@ DecoderFactory = Callable[[Path], Decoder]
 class VideoFileFrameSource:
     """Yield metadata frames for one configured recorded-video camera.
 
-    Frame indexes are zero-based internally. Since ``CameraFrame`` deliberately
-    contains no index or payload, source order and timestamp offsets expose that
-    ordering without adding a competing domain concept.
+    Frame indexes are zero-based and explicit on each decoded frame. The source
+    increments them once for every successfully decoded frame.
     """
 
     def __init__(
@@ -115,6 +117,7 @@ class VideoFileFrameSource:
                     pixels=payload,
                     width=decoder.width,
                     height=decoder.height,
+                    frame_index=frame_index,
                     pixel_format=decoder.pixel_format,
                 )
                 frame_index += 1

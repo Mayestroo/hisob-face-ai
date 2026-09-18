@@ -75,6 +75,7 @@ def test_valid_source_yields_ordered_frames_and_preserves_camera_metadata(tmp_pa
     assert [item.frame.camera_id for item in frames] == ["LOBBY_WEST"] * 3
     assert [item.frame.camera_role for item in frames] == [CameraRole.ENTRY] * 3
     assert [item.frame.timestamp for item in frames] == [START + timedelta(seconds=offset) for offset in (0, 0.5, 1)]
+    assert [item.frame_index for item in frames] == [0, 1, 2]
     assert all(item.frame.timestamp.tzinfo is not None for item in frames)
     assert [item.pixels for item in frames] == [b"one!", b"two!", b"tri!"]
     assert [(item.width, item.height, item.pixel_format) for item in frames] == [(2, 2, "gray")] * 3
@@ -191,6 +192,7 @@ def test_decoded_frame_is_immutable() -> None:
         pixels=b"data",
         width=2,
         height=2,
+        frame_index=0,
     )
 
     with pytest.raises(AttributeError):

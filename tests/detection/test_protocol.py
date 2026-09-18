@@ -16,6 +16,7 @@ def make_frame() -> DecodedVideoFrame:
         pixels=b"data",
         width=2,
         height=2,
+        frame_index=0,
     )
 
 

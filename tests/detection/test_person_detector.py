@@ -23,6 +23,7 @@ def make_frame(width: int = 640, height: int = 640, role: CameraRole = CameraRol
         pixels=bytes(index % 256 for index in range(width * height)),
         width=width,
         height=height,
+        frame_index=0,
     )
 
 
